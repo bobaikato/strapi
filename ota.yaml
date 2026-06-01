@@ -33,20 +33,20 @@ tasks:
     context: host
     category: setup
     description: Install repo dependencies.
-    run: corepack yarn install
+    run: corepack yarn set version 4.12.0 && corepack yarn install
     execution:
       default_mode: native
       modes:
         native:
           context: host
-          run: corepack yarn install
+          run: corepack yarn set version 4.12.0 && corepack yarn install
         container:
           context: app
-          run: corepack yarn install
+          run: corepack yarn set version 4.12.0 && corepack yarn install
     effects:
       network: true
       network_kind: dependency_hydration
-    notes: Install workspace dependencies through the repo root package manager.
+    notes: Materialize the repo-pinned Yarn release, then install workspace dependencies.
     internal: true
   lint:
     context: host
@@ -64,7 +64,6 @@ tasks:
           run: corepack yarn lint
     depends_on:
       - setup
-    safe_for_agent: true
     notes: Run the root lint surface declared by repository scripts.
   test:
     context: host
