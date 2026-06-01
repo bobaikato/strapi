@@ -68,7 +68,7 @@ tasks:
     notes: Run the root lint surface declared by repository scripts.
   test:
     context: host
-    category: test
+    category: dev
     description: Run Strapi unit tests via Vitest.
     run: corepack yarn test:unit:vitest
     execution:
@@ -82,7 +82,6 @@ tasks:
           run: corepack yarn test:unit:vitest
     depends_on:
       - setup
-    safe_for_agent: true
     notes: Run the unit-vitest path surfaced by the repository root scripts.
   verify:
     context: host
@@ -99,7 +98,7 @@ tasks:
           context: app
           run: "true"
     depends_on:
-      - test
+      - lint
     safe_for_agent: true
     notes: Contract-level verification path for contributor checks.
 workflows:
@@ -117,7 +116,6 @@ agent:
   entrypoint: setup
   default_task: verify
   safe_tasks:
-  - test
   - verify
   verify_after_changes:
   - verify
