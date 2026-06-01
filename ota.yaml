@@ -1,0 +1,158 @@
+version: 1
+metadata:
+  ota:
+    minimum_version: "1.6.18"
+project:
+  name: strapi
+  description: Strapi contributor readiness slice covering root workspace install, lint, and API tests
+execution:
+  default_context: host
+  contexts:
+    host:
+      backend: native
+    app:
+      backend: container
+      lifecycle: ephemeral
+      container:
+        image: node:22-bookworm
+        engines:
+          - docker
+          - podman
+      attachments:
+        isolated_paths:
+          - node_modules
+          - .yarn
+toolchains:
+  node:
+    provider: corepack
+    version: '22'
+    package_managers:
+      yarn: '4'
+tasks:
+  setup:
+    context: host
+    category: setup
+    description: Install repo dependencies.
+    run: corepack yarn install
+    execution:
+      default_mode: native
+      modes:
+        native:
+          context: host
+          run: corepack yarn install
+        container:
+          context: app
+          run: corepack yarn install
+    effects:
+      network: true
+      network_kind: dependency_hydration
+    notes: Install workspace dependencies through the repo root package manager.
+    internal: true
+  lint:
+    context: host
+    category: test
+    description: Run Strapi workspace lint checks.
+    run: corepack yarn lint
+    execution:
+      default_mode: native
+      modes:
+        native:
+          context: host
+          run: corepack yarn lint
+        container:
+          context: app
+          run: corepack yarn lint
+    depends_on:
+      - setup
+    safe_for_agent: true
+    notes: Run the root lint surface declared by repository scripts.
+  test:
+    context: host
+    category: test
+    description: Run Strapi API test suite.
+    run: corepack yarn test:api
+    execution:
+      default_mode: native
+      modes:
+        native:
+          context: host
+          run: corepack yarn test:api
+        container:
+          context: app
+          run: corepack yarn test:api
+    depends_on:
+      - setup
+    safe_for_agent: true
+    notes: Run the API test path surfaced by the repository root scripts.
+  verify:
+    context: host
+    category: test
+    description: Aggregate lint and API tests.
+    run: "true"
+    execution:
+      default_mode: native
+      modes:
+        native:
+          context: host
+          run: "true"
+        container:
+          context: app
+          run: "true"
+    depends_on:
+      - lint
+      - test
+    safe_for_agent: true
+    notes: Contract-level verification path for contributor checks.
+agent:
+  posture: readiness_strict
+  entrypoint: setup
+  default_task: verify
+  safe_tasks:
+  - lint
+  - test
+  - verify
+  verify_after_changes:
+  - verify
+  writable_paths:
+  - docs
+  - examples/complex
+  - examples/empty
+  - examples/experimental-dev
+  - examples/getstarted
+  - examples/kitchensink
+  - examples/kitchensink-ts
+  - examples/plugins
+  - packages/admin-test-utils
+  - packages/cli
+  - packages/core
+  - packages/generators
+  - packages/plugins
+  - packages/providers
+  - packages/utils
+  - public
+  - scripts
+  - templates
+  - tests
+  protected_paths:
+  - .github/workflows
+  - ota.yaml
+  - yarn.lock
+  inferred_boundary:
+    reviewed: false
+    provenance:
+      writable_paths:
+      - init:common_source_roots
+      - init:nested_project_root
+      - init:stack_source_scan
+      protected_paths:
+      - init:contract_file_default
+      - init:stack_companion_control_files
+  bootstrap:
+    ota:
+      note: Only install ota if it is missing and installation is approved.
+      sh: curl -fsSL https://dist.ota.run/install.sh | OTA_VERSION=v1.6.18 sh
+      powershell: $env:OTA_VERSION='v1.6.18'; irm https://dist.ota.run/install.ps1 | iex
+  notes: |
+    Use `ota tasks --safe --use` to inspect the approved agent task surface before execution.
+    Use `ota validate` before changes and `ota doctor` after edits.
+    Use `ota run verify` for the contract verification path.

@@ -168,3 +168,8 @@ examples/**/types/generated
 
 # Ignore yarn.lock inside templates
 templates/yarn.lock
+
+# Ota local runtime artifacts
+.ota/state/*
+.ota/receipts/*
+.ota/proof/*
