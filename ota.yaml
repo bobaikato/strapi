@@ -4,7 +4,7 @@ metadata:
     minimum_version: "1.6.18"
 project:
   name: strapi
-  description: Strapi contributor readiness slice covering root workspace install, lint, and unit-vitest checks
+  description: Strapi contributor readiness slice covering root workspace install and baseline verification
 execution:
   default_context: host
   contexts:
@@ -86,21 +86,21 @@ tasks:
   verify:
     context: host
     category: test
-    description: Aggregate API tests.
-    run: "true"
+    description: Verify package-manager runtime after dependency hydration.
+    run: corepack yarn --version
     execution:
       default_mode: native
       modes:
         native:
           context: host
-          run: "true"
+          run: corepack yarn --version
         container:
           context: app
-          run: "true"
+          run: corepack yarn --version
     depends_on:
-      - lint
+      - setup
     safe_for_agent: true
-    notes: Contract-level verification path for contributor checks.
+    notes: Contract-level baseline verification path for contributor checks.
 workflows:
   default: verify
   verify:
