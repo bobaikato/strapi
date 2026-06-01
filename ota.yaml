@@ -4,7 +4,7 @@ metadata:
     minimum_version: "1.6.18"
 project:
   name: strapi
-  description: Strapi contributor readiness slice covering root workspace install, lint, and API tests
+  description: Strapi contributor readiness slice covering root workspace install, lint, and unit-vitest checks
 execution:
   default_context: host
   contexts:
@@ -69,21 +69,21 @@ tasks:
   test:
     context: host
     category: test
-    description: Run Strapi API test suite.
-    run: corepack yarn test:api
+    description: Run Strapi unit tests via Vitest.
+    run: corepack yarn test:unit:vitest
     execution:
       default_mode: native
       modes:
         native:
           context: host
-          run: corepack yarn test:api
+          run: corepack yarn test:unit:vitest
         container:
           context: app
-          run: corepack yarn test:api
+          run: corepack yarn test:unit:vitest
     depends_on:
       - setup
     safe_for_agent: true
-    notes: Run the API test path surfaced by the repository root scripts.
+    notes: Run the unit-vitest path surfaced by the repository root scripts.
   verify:
     context: host
     category: test
