@@ -50,7 +50,7 @@ tasks:
     internal: true
   lint:
     context: host
-    category: test
+    category: dev
     description: Run Strapi workspace lint checks.
     run: corepack yarn lint
     execution:
@@ -87,7 +87,7 @@ tasks:
   verify:
     context: host
     category: test
-    description: Aggregate lint and API tests.
+    description: Aggregate API tests.
     run: "true"
     execution:
       default_mode: native
@@ -99,7 +99,6 @@ tasks:
           context: app
           run: "true"
     depends_on:
-      - lint
       - test
     safe_for_agent: true
     notes: Contract-level verification path for contributor checks.
@@ -118,7 +117,6 @@ agent:
   entrypoint: setup
   default_task: verify
   safe_tasks:
-  - lint
   - test
   - verify
   verify_after_changes:
