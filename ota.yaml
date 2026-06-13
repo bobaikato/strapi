@@ -2,6 +2,9 @@ version: 1
 metadata:
   ota:
     minimum_version: "1.6.18"
+# Pressure-test note (local branch):
+# - Remove `build` before an upstream PR unless the widened build lane is fully proven in matrix and
+#   we want the PR to claim more than the lightweight baseline verify path.
 project:
   name: strapi
   description: Strapi contributor readiness slice covering root workspace install and baseline verification
@@ -63,7 +66,10 @@ tasks:
           run: corepack yarn lint
     depends_on:
       - setup
-    notes: Run the root lint surface declared by repository scripts.
+    notes: |
+      Run the root lint surface declared by repository scripts.
+      This is the truthful repo lint lane for the slice, and upstream warnings currently fail the
+      task rather than behaving like a lightweight advisory pass.
   test:
     context: host
     category: dev
@@ -80,7 +86,30 @@ tasks:
           run: corepack yarn test:unit:vitest
     depends_on:
       - setup
-    notes: Run the unit-vitest path surfaced by the repository root scripts.
+    notes: |
+      Run the unit-vitest path surfaced by the repository root scripts.
+      This is a real supported test lane, but it currently reflects an upstream failing Vitest
+      suite rather than a guaranteed quick local smoke pass.
+  build:
+    context: host
+    category: build
+    description: Build the Strapi workspace packages.
+    run: corepack yarn build
+    execution:
+      default_mode: native
+      modes:
+        native:
+          context: host
+          run: corepack yarn build
+        container:
+          context: app
+          run: corepack yarn build
+    depends_on:
+      - setup
+    notes: |
+      Run the root build surface declared by repository scripts.
+      This is a widened pressure-test lane and should stay local-only unless matrix proof shows the
+      repo wants this broader build claim in the upstream contract.
   verify:
     context: host
     category: test
@@ -98,7 +127,10 @@ tasks:
     depends_on:
       - setup
     safe_for_agent: true
-    notes: Contract-level baseline verification path for contributor checks.
+    notes: |
+      Contract-level baseline verification path for contributor checks.
+      This path is intentionally lightweight compared with `lint` and `test`, and is the safer
+      local-fast baseline when you only need setup plus package-manager/runtime proof.
 workflows:
   default: verify
   verify:
@@ -109,6 +141,8 @@ workflows:
       task: verify
     notes: |
       Use `ota up --workflow verify` to run the declared setup plus verification sequence.
+      This workflow is the local-fast baseline for the slice; use `ota run lint` or `ota run test`
+      when you want the heavier real repo lanes that currently surface upstream failures.
 agent:
   posture: readiness_strict
   entrypoint: setup
@@ -154,11 +188,13 @@ agent:
   bootstrap:
     ota:
       note: Only install ota if it is missing and installation is approved.
-      sh: curl -fsSL https://dist.ota.run/install.sh | OTA_VERSION=v1.6.18 sh
-      powershell: $env:OTA_VERSION='v1.6.18'; irm https://dist.ota.run/install.ps1 | iex
+      sh: curl -fsSL https://dist.ota.run/install.sh | OTA_VERSION=v1.6.20 sh
+      powershell: $env:OTA_VERSION='v1.6.20'; irm https://dist.ota.run/install.ps1 | iex
   notes: |
     Use `ota workflows` to inspect declared workflow paths.
     Use `ota up --workflow verify` when you want setup and verification through one declared path.
     Use `ota tasks --safe --use` to inspect the approved agent task surface before execution.
     Use `ota validate` before changes and `ota doctor` after edits.
     Use `ota run verify` for the contract verification path.
+    Treat `verify` as the light baseline and `lint` / `test` as the real repo lanes, which
+    currently expose upstream failures rather than clean local-smoke paths.
