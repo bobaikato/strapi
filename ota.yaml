@@ -26,10 +26,12 @@ execution:
           - node_modules
 toolchains:
   node:
-    provider: corepack
     version: '22'
     package_managers:
       yarn: '4'
+    fulfillment:
+      source: corepack
+      mode: run
 tasks:
   setup:
     context: host
