@@ -1,13 +1,13 @@
 version: 1
 metadata:
   ota:
-    minimum_version: "1.6.18"
+    minimum_version: "1.6.21"
 # Pressure-test note (local branch):
 # - Remove `build` before an upstream PR unless the widened build lane is fully proven in matrix and
 #   we want the PR to claim more than the lightweight baseline verify path.
 project:
   name: strapi
-  description: Strapi contributor readiness slice covering root workspace install and baseline verification
+  description: Strapi contributor readiness slice covering workspace hydration plus root lint, unit-test, and optional build proof
 execution:
   default_context: host
   contexts:
@@ -36,58 +36,75 @@ tasks:
   setup:
     context: host
     category: setup
-    description: Install repo dependencies.
-    run: corepack yarn set version 4.12.0 && corepack yarn install
+    description: Install Strapi workspace dependencies through the declared Yarn hydration lane.
+    prepare:
+      kind: dependency_hydration
+      medium: package_dependencies
+      source:
+        kind: node_package_manager
+        cwd: .
+        manager: yarn
+        mode: install
+        frozen_lockfile: true
     execution:
       default_mode: native
       modes:
-        native:
-          context: host
-          run: corepack yarn set version 4.12.0 && corepack yarn install
         container:
           context: app
-          run: corepack yarn set version 4.12.0 && corepack yarn install
     effects:
+      writes:
+        - node_modules
       network: true
       network_kind: dependency_hydration
-    notes: Materialize the repo-pinned Yarn release, then install workspace dependencies.
+    requirements:
+      toolchains:
+        - node
+    notes: |
+      The repo already declares `packageManager: yarn@4.12.0`, so Ota can own this as structured
+      Yarn hydration instead of an opaque shell that manually resets the package-manager version.
     internal: true
   lint:
     context: host
-    category: dev
+    category: test
     description: Run Strapi workspace lint checks.
-    run: corepack yarn lint
+    command:
+      exe: corepack
+      args:
+        - yarn
+        - lint
     execution:
       default_mode: native
       modes:
-        native:
-          context: host
-          run: corepack yarn lint
         container:
           context: app
-          run: corepack yarn lint
     depends_on:
       - setup
+    requirements:
+      toolchains:
+        - node
     notes: |
       Run the root lint surface declared by repository scripts.
       This is the truthful repo lint lane for the slice, and upstream warnings currently fail the
       task rather than behaving like a lightweight advisory pass.
   test:
     context: host
-    category: dev
+    category: test
     description: Run Strapi unit tests via Vitest.
-    run: corepack yarn test:unit:vitest
+    command:
+      exe: corepack
+      args:
+        - yarn
+        - test:unit:vitest
     execution:
       default_mode: native
       modes:
-        native:
-          context: host
-          run: corepack yarn test:unit:vitest
         container:
           context: app
-          run: corepack yarn test:unit:vitest
     depends_on:
       - setup
+    requirements:
+      toolchains:
+        - node
     notes: |
       Run the unit-vitest path surfaced by the repository root scripts.
       This is a real supported test lane, but it currently reflects an upstream failing Vitest
@@ -96,43 +113,37 @@ tasks:
     context: host
     category: build
     description: Build the Strapi workspace packages.
-    run: corepack yarn build
+    command:
+      exe: corepack
+      args:
+        - yarn
+        - build
     execution:
       default_mode: native
       modes:
-        native:
-          context: host
-          run: corepack yarn build
         container:
           context: app
-          run: corepack yarn build
     depends_on:
       - setup
+    requirements:
+      toolchains:
+        - node
     notes: |
       Run the root build surface declared by repository scripts.
       This is a widened pressure-test lane and should stay local-only unless matrix proof shows the
       repo wants this broader build claim in the upstream contract.
   verify:
-    context: host
     category: test
-    description: Verify package-manager runtime after dependency hydration.
-    run: corepack yarn --version
-    execution:
-      default_mode: native
-      modes:
-        native:
-          context: host
-          run: corepack yarn --version
-        container:
-          context: app
-          run: corepack yarn --version
-    depends_on:
-      - setup
+    description: Run the canonical Strapi contributor verification slice.
+    aggregate:
+      tasks:
+        - lint
+        - test
     safe_for_agent: true
     notes: |
-      Contract-level baseline verification path for contributor checks.
-      This path is intentionally lightweight compared with `lint` and `test`, and is the safer
-      local-fast baseline when you only need setup plus package-manager/runtime proof.
+      Contract-level verification path for contributor checks.
+      This keeps the default proof on the real lint and unit-test surfaces instead of a synthetic
+      package-manager smoke lane.
 workflows:
   default: verify
   verify:
@@ -143,8 +154,8 @@ workflows:
       task: verify
     notes: |
       Use `ota up --workflow verify` to run the declared setup plus verification sequence.
-      This workflow is the local-fast baseline for the slice; use `ota run lint` or `ota run test`
-      when you want the heavier real repo lanes that currently surface upstream failures.
+      This workflow is the truthful contributor baseline for the slice: workspace hydration plus
+      the real root lint and unit-test lanes.
 agent:
   posture: readiness_strict
   entrypoint: setup
@@ -154,6 +165,7 @@ agent:
   verify_after_changes:
   - verify
   writable_paths:
+  - node_modules
   - docs
   - examples/complex
   - examples/empty
@@ -190,13 +202,13 @@ agent:
   bootstrap:
     ota:
       note: Only install ota if it is missing and installation is approved.
-      sh: curl -fsSL https://dist.ota.run/install.sh | OTA_GIT_REV=08c270351c9870c82a39899161388bb250ad23c4 sh -s -- --from-git
-      powershell: $env:OTA_GIT_REV='08c270351c9870c82a39899161388bb250ad23c4'; & ([scriptblock]::Create((irm https://dist.ota.run/install.ps1))) -FromGit
+      sh: curl -fsSL https://dist.ota.run/install.sh | OTA_GIT_BRANCH=1.6.22-implementation sh -s -- --from-git
+      powershell: $env:OTA_GIT_BRANCH='1.6.22-implementation'; & ([scriptblock]::Create((irm https://dist.ota.run/install.ps1))) -FromGit
   notes: |
     Use `ota workflows` to inspect declared workflow paths.
     Use `ota up --workflow verify` when you want setup and verification through one declared path.
     Use `ota tasks --safe --use` to inspect the approved agent task surface before execution.
     Use `ota validate` before changes and `ota doctor` after edits.
     Use `ota run verify` for the contract verification path.
-    Treat `verify` as the light baseline and `lint` / `test` as the real repo lanes, which
-    currently expose upstream failures rather than clean local-smoke paths.
+    Treat `verify` as the real contributor baseline for this slice, and `build` as the widened
+    pressure lane that remains outside the default claim until broader matrix proof says otherwise.
